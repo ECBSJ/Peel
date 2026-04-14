@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@peelbtc/types": ["../types/dist/index.d.ts"]
+    }
+  },
+  "include": ["src"]
+}

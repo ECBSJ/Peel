@@ -1,0 +1,20 @@
+{
+  "name": "peel",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean"
+  },
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "tsup": "^8.5.1",
+    "turbo": "^2.9.4",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.3"
+  }
+}
