@@ -14,11 +14,22 @@ import {
 // BRID Identity Proof message. The secp256k1 signature reveals the public key
 // via elliptic curve public key recovery — no private key exposure required.
 //
-// Signing format: standard Bitcoin message signature
-//   65 bytes  = 1 header byte + 32 r + 32 s, transmitted as base64
-//   header    = 27 + recoveryId  (uncompressed key, values 27–30)
-//   header    = 31 + recoveryId  (compressed key,   values 31–34)
-//   recoveryId is exposed directly via @noble/curves Signature.recovery
+// Signature format — two variants are accepted:
+//
+//   Noble/OWS format (raw recovery ID):
+//     65 bytes = [ 0 | 1 ] || r(32) || s(32)
+//     First byte is the raw secp256k1 recovery ID (0 or 1).
+//     Used by @noble/curves, OWS, and similar libraries.
+//
+//   BIP137 format (header byte encodes address type + recovery ID):
+//     65 bytes = [ header ] || r(32) || s(32)
+//     Header value encodes both the address type and recovery ID:
+//       27–30: P2PKH uncompressed  (header - 27 = recoveryId)
+//       31–34: P2PKH compressed    (header - 31 = recoveryId)
+//       35–38: P2SH-P2WPKH        (header - 35 = recoveryId)
+//       39–42: P2WPKH bech32      (header - 39 = recoveryId)  ← only type BRID accepts
+//     Used by Sparrow, Electrum, Ledger, Trezor, and most Bitcoin wallets.
+//     Only P2WPKH bech32 (39–42) is valid for BRID — other types are rejected.
 //
 // Message hashing: double-SHA256 with Bitcoin magic prefix
 //   SHA256(SHA256( \x18"Bitcoin Signed Message:\n" || varint(len) || message ))
@@ -116,13 +127,46 @@ export function recoverPublicKey(
       `Invalid signature: expected 65 bytes, got ${sigBytes.length}`,
     );
   }
-  
-  // Hash the message using Bitcoin's message hashing format
+
+  // Normalize the header byte to a raw noble recovery ID (0 or 1).
+  //
+  // If the first byte is 0 or 1 it is already a raw recovery ID (noble/OWS format).
+  // If it falls in the BIP137 range (27–42) it encodes address type + recovery ID:
+  //   only P2WPKH bech32 (39–42) is valid for BRID — all other types are rejected.
+  const headerByte = sigBytes[0];
+  let normalizedSig: Uint8Array;
+
+  if (headerByte === 0 || headerByte === 1) {
+    // Raw noble/OWS recovery ID — no transformation needed.
+    normalizedSig = sigBytes;
+  } else if (headerByte >= 27 && headerByte <= 38) {
+    // BIP137 P2PKH or P2SH-P2WPKH — not a native bech32 address type.
+    const typeName =
+      headerByte <= 30 ? "P2PKH uncompressed" :
+      headerByte <= 34 ? "P2PKH compressed" :
+      "P2SH-P2WPKH";
+    throw new Error(
+      `Invalid signature: BIP137 header byte ${headerByte} indicates ${typeName}. ` +
+      `BRID requires a native SegWit P2WPKH (bech32) signature (header bytes 39–42).`,
+    );
+  } else if (headerByte >= 39 && headerByte <= 42) {
+    // BIP137 P2WPKH bech32 — extract the raw recovery ID and rewrite the first byte.
+    const recoveryId = headerByte - 39;
+    normalizedSig = new Uint8Array(sigBytes);
+    normalizedSig[0] = recoveryId;
+  } else {
+    throw new Error(
+      `Invalid signature: unrecognised header byte ${headerByte}. ` +
+      `Expected 0–1 (noble/OWS) or 27–42 (BIP137).`,
+    );
+  }
+
+  // Hash the message using Bitcoin's message hashing format.
   const msgHash = hashBitcoinMessage(message);
-  
+
   let recoveredPubkey: Uint8Array;
   try {
-    recoveredPubkey = secp256k1.recoverPublicKey(sigBytes, msgHash);
+    recoveredPubkey = secp256k1.recoverPublicKey(normalizedSig, msgHash, { prehash: false });
   } catch (err) {
     throw new Error(
       `Public key recovery failed: ${err instanceof Error ? err.message : String(err)}`,

@@ -35,7 +35,8 @@ function hexToBytes(hex: string): Uint8Array {
 function signBitcoinMessage(message: string, privkeyHex: string): string {
   const privkey = hexToBytes(privkeyHex);
   const msgHash = hashBitcoinMessage(message);
-  const sig65 = secp256k1.sign(msgHash, privkey, { format: 'recovered' }); // 65-byte: recovery || r || s
+  const sig65 = secp256k1.sign(msgHash, privkey, { prehash: false, format: 'recovered' }); // 65-byte: recovery (v) || r || s
+  const sigInstance = secp256k1.Signature.fromBytes(sig65, 'recovered');
 
   const base64 = btoa(
     Array.from(sig65, b => String.fromCharCode(b)).join("")
@@ -89,6 +90,29 @@ describe("hashBitcoinMessage", () => {
 // ---------------------------------------------------------------------------
 
 describe("recoverPublicKey", () => {
+  it("recovers public key from an OWS signature", () => {
+    const owsAddress = "bc1qrk3txtstlpdffr3lss4nq3x0rfs7nhcqqpr33k"
+    let owsPubKey = "0365b706e3ab5ece1c73f6a7a21626871b2c43919ff87599abe887a29343484524"
+    let owsPrivKey = "Kz6YweubWZNr3BB6CyRPiN5QNZPL19PpaEqhUGPspBz2JbeEf5TS"
+
+    const message = "bitcoin";
+    let msgHash = "9206313371d3609df9d62b0e24026d6ac518c128f74640b4189c7f3aeb280c09"
+
+    // OWS returns signature in r || s || v format
+    let owsSignatureObj = {
+        "recovery_id": 1,
+        "signature": "3a0a1f7a28c7b0c28111f4eff1c18b76d8cf33ffdf996b6ca402119e11580f5d3ed721d51537b486692648823129c0545b3a90069e2240d6d640effb7fb6c3fd01"
+    }
+    let sigBytes = hexToBytes(owsSignatureObj.signature)
+    let adjustedSigBytes = new Uint8Array([sigBytes[sigBytes.length - 1], ...sigBytes.subarray(0, -1)])
+    let owsSig = Buffer.from(adjustedSigBytes).toString('base64')
+
+    let verified = secp256k1.verify(adjustedSigBytes, hexToBytes(msgHash), hexToBytes(owsPubKey), { prehash: false, format: 'recovered' })
+    let recovered = recoverPublicKey(owsAddress, message, owsSig)
+    expect(verified).toBeTruthy()
+    expect(Buffer.from(recovered).toString('hex')).toBe(owsPubKey)
+  })
+
   it("recovers the correct compressed public key", () => {
     const message = buildIdentityProofMessage(ADDRESS_1);
     const sig = signBitcoinMessage(message, PRIVKEY_1_HEX);
