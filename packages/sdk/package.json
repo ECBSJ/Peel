@@ -18,6 +18,7 @@
       }
     }
   },
+  "type": "module",
   "files": ["dist"],
   "scripts": {
     "build": "tsup",

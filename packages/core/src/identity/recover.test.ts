@@ -188,14 +188,16 @@ describe("buildBridIdentityMap", () => {
     expect(map.publicKey).toBe(PUBKEY_1_HEX);
   });
 
-  it("returns exactly 3 derived addresses (bitcoin, stacks, evm)", () => {
+  it("returns exactly 5 derived addresses (bitcoin, stacks, bob, rootstock, citrea)", () => {
     const message = buildIdentityProofMessage(ADDRESS_1);
     const sig = signBitcoinMessage(message, PRIVKEY_1_HEX);
     const map = buildBridIdentityMap(ADDRESS_1, message, sig);
-    expect(map.derived).toHaveLength(3);
+    expect(map.derived).toHaveLength(5);
     expect(map.derived[0].layer).toBe("bitcoin");
     expect(map.derived[1].layer).toBe("stacks");
-    expect(map.derived[2].layer).toBe("evm");
+    expect(map.derived[2].layer).toBe("bob");
+    expect(map.derived[3].layer).toBe("rootstock");
+    expect(map.derived[4].layer).toBe("citrea");
   });
 
   it("bitcoin derived address is the root address", () => {
@@ -205,11 +207,13 @@ describe("buildBridIdentityMap", () => {
     expect(map.derived[0].address).toBe(ADDRESS_1);
   });
 
-  it("evm derived address matches known test vector", () => {
+  it("evm derived addresses (bob, rootstock, citrea) all match the same known test vector", () => {
     const message = buildIdentityProofMessage(ADDRESS_1);
     const sig = signBitcoinMessage(message, PRIVKEY_1_HEX);
     const map = buildBridIdentityMap(ADDRESS_1, message, sig);
-    expect(map.derived[2].address).toBe(EVM_ADDRESS_1);
+    expect(map.derived[2].address).toBe(EVM_ADDRESS_1); // bob
+    expect(map.derived[3].address).toBe(EVM_ADDRESS_1); // rootstock
+    expect(map.derived[4].address).toBe(EVM_ADDRESS_1); // citrea
   });
 
   it("all derived addresses are mainnet (testnet: false)", () => {

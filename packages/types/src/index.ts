@@ -17,3 +17,9 @@ export type {
 } from "./adapter.js";
 export { PeelError } from "./error.js";
 export type { PeelErrorCode } from "./error.js";
+export type {
+  BalanceKind,
+  LayerBalance,
+  BalanceMap,
+  RpcOverrides,
+} from "./balance.js";

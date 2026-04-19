@@ -1,5 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
+import { Caip2Namespace } from "@peelbtc/types";
 import type { DerivedAddress } from "@peelbtc/types";
 import {
   deriveBitcoinAddress,
@@ -210,13 +211,24 @@ export function buildBridIdentityMap(
     b.toString(16).padStart(2, "0"),
   ).join("");
 
+  // Derive the EVM address once — same address is valid on all EVM Bitcoin L2s.
+  // Expand into named per-chain entries so outputs are chain-specific, not "evm".
+  const { address: evmAddress } = deriveEvmAddress(pubkey, isTestnet);
+  const evmLayers = ["bob", "rootstock", "citrea"].map((layer) => ({
+    address: evmAddress,
+    layer,
+    namespace: Caip2Namespace.Eip155,
+    format: "eip55",
+    testnet: isTestnet,
+  }));
+
   return {
     root: address,
     publicKey: pubkeyHex,
     derived: [
       deriveBitcoinAddress(pubkey, isTestnet),
       deriveStacksAddress(pubkey, isTestnet),
-      deriveEvmAddress(pubkey, isTestnet),
+      ...evmLayers,
     ],
   };
 }

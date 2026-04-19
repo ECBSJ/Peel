@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Framework-agnostic routing engine for Peel",
   "license": "MIT",
+  "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,10 +30,10 @@
   },
   "dependencies": {
     "@noble/curves": "^2.0.1",
-    "@noble/hashes": "^2.0.1",
-    "@peelbtc/types": "workspace:*"
+    "@noble/hashes": "^2.0.1"
   },
   "devDependencies": {
+    "@peelbtc/types": "workspace:*",
     "@stacks/transactions": "^7.4.0"
   }
 }
