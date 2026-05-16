@@ -1,78 +1,81 @@
 // ---------------------------------------------------------------------------
-// BOB balance fetcher — ETH (native) + tBTC (ERC-20)
+// BOB balance fetcher
 //
-// API: BOB JSON-RPC (public node, no auth required for low-volume use)
-// Methods:
-//   eth_getBalance(address, "latest")         — ETH native balance in wei
-//   eth_call({ to: tbtcContract, data: balanceOf(address) }, "latest")
-//                                             — tBTC token balance in wei
+// Fetches:
+//   - ETH native balance (gas token, isBtc = false)
+//   - One or more wrapped BTC token balances (ERC-20, isBtc = true)
 //
-// ETH uses 18 decimals (wei). tBTC uses 18 decimals (ERC-20 convention).
+// BOB does not have a single canonical wrapped BTC — it supports multiple
+// (wBTC, tBTC, SolvBTC, etc). The `wrappedBtcTokens` parameter accepts
+// an array of token configs, so callers decide which tokens to query.
+// A sensible default is provided for common use.
 //
-// tBTC on BOB is bridged via Threshold Network tBTC v2. BOB uses tBTC as
-// its canonical BTC representation. ETH is the native gas token (not BTC).
-//
-// ⚠️  VERIFY:
-//   - BOB mainnet RPC URL: https://rpc.gobob.xyz  (chain 60808)
-//   - BOB testnet RPC URL: https://testnet.rpc.gobob.xyz  (chain 808)
-//   - tBTC contract addresses in contracts.ts
+// Chain: viem exports `bob` (mainnet, chain 60808) and `bobSepolia`
+// (testnet, chain 808813) with built-in RPC URLs — no hardcoding needed.
 // ---------------------------------------------------------------------------
 
+import { erc20Abi, type Address } from "viem";
+import { bob, bobSepolia } from "viem/chains";
 import type { LayerBalance } from "@peelbtc/types";
-import { TBTC_BOB, BALANCE_OF_SELECTOR } from "./contracts.js";
+import { createEvmClient } from "./evm-client.js";
 
-/**
- * Encode an EVM address as a zero-padded 32-byte hex parameter for eth_call.
- * Strips the 0x prefix from the address and left-pads to 64 hex chars.
- */
-function encodeAddressParam(address: string): string {
-  return address.replace(/^0x/i, "").toLowerCase().padStart(64, "0");
+// ---------------------------------------------------------------------------
+// Wrapped BTC token registry for BOB
+//
+// BOB supports multiple wrapped BTC assets. Each entry here will produce
+// one LayerBalance entry with isBtc = true.
+// ---------------------------------------------------------------------------
+
+export interface BobWrappedBtcToken {
+  /** Asset symbol shown in LayerBalance */
+  asset: string;
+  /** ERC-20 contract address on BOB mainnet */
+  mainnet: Address;
+  /** ERC-20 contract address on BOB testnet (bobSepolia) */
+  testnet: Address;
+  /** Number of decimals — wBTC uses 8, tBTC uses 18 */
+  decimals: number;
 }
 
 /**
- * Make a JSON-RPC call to an EVM node.
+ * Default wrapped BTC tokens tracked on BOB.
+ * Pass a custom array to `fetchBobBalances` to override.
+ *
  */
-async function jsonRpc(
-  rpcUrl: string,
-  method: string,
-  params: unknown[],
-): Promise<string> {
-  const res = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
+export const BOB_WRAPPED_BTC_TOKENS: BobWrappedBtcToken[] = [
+  {
+    asset: "wBTC",
+    mainnet: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+    // ⚠️  VERIFY: wBTC on BOB testnet (bobSepolia)
+    testnet: "0x0000000000000000000000000000000000000000",
+    decimals: 8,
+  },
+];
 
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-  }
-
-  const data = (await res.json()) as { result?: string; error?: { message: string } };
-
-  if (data.error) {
-    throw new Error(data.error.message);
-  }
-
-  return data.result ?? "0x0";
-}
+// ---------------------------------------------------------------------------
+// fetchBobBalances
+// ---------------------------------------------------------------------------
 
 /**
- * Fetch ETH (native) and tBTC (ERC-20) balances for a BOB address.
+ * Fetch ETH and wrapped BTC token balances for a BOB address.
  *
- * Returns two LayerBalance entries:
- *   [0] ETH native balance in wei  (isBtc = false)
- *   [1] tBTC token balance in wei  (isBtc = true)
+ * Returns one LayerBalance for ETH (isBtc = false) followed by one entry
+ * per token in `wrappedBtcTokens` (isBtc = true).
  *
- * @param address   EVM address (0x...)
- * @param rpcUrl    BOB JSON-RPC endpoint
- * @param testnet   Whether this is a testnet address
- * @returns         Array of two LayerBalance entries (ETH + tBTC)
+ * @param address           EVM address (0x...)
+ * @param testnet           true → bobSepolia, false → bob mainnet
+ * @param wrappedBtcTokens  Tokens to query. Defaults to BOB_WRAPPED_BTC_TOKENS.
+ * @param rpcUrl            Optional RPC URL override (defaults to viem built-in).
  */
 export async function fetchBobBalances(
-  address: string,
-  rpcUrl: string,
+  address: Address,
   testnet: boolean,
+  wrappedBtcTokens: BobWrappedBtcToken[] = BOB_WRAPPED_BTC_TOKENS,
+  rpcUrl?: string,
 ): Promise<LayerBalance[]> {
+  const chain = testnet ? bobSepolia : bob;
+  const client = createEvmClient(chain, rpcUrl);
+
   const ethBase: LayerBalance = {
     layer: "bob",
     address,
@@ -84,40 +87,41 @@ export async function fetchBobBalances(
     testnet,
   };
 
-  const tbtcBase: LayerBalance = {
+  // Build token base entries
+  const tokenBases: LayerBalance[] = wrappedBtcTokens.map((token) => ({
     layer: "bob",
     address,
-    asset: "tBTC",
-    kind: "token",
+    asset: token.asset,
+    kind: "token" as const,
     balance: 0n,
-    decimals: 18,
+    decimals: token.decimals,
     isBtc: true,
     testnet,
-  };
+  }));
 
-  const tbtcContract = testnet ? TBTC_BOB.testnet : TBTC_BOB.mainnet;
-
-  // Fetch ETH and tBTC in parallel
-  const [ethResult, tbtcResult] = await Promise.allSettled([
-    jsonRpc(rpcUrl, "eth_getBalance", [address, "latest"]),
-    jsonRpc(rpcUrl, "eth_call", [
-      {
-        to: tbtcContract,
-        data: `${BALANCE_OF_SELECTOR}${encodeAddressParam(address)}`,
-      },
-      "latest",
-    ]),
+  // Fetch ETH native balance + all token balances in parallel
+  const [ethResult, ...tokenResults] = await Promise.allSettled([
+    client.getBalance({ address }),
+    ...wrappedBtcTokens.map((token) =>
+      client.readContract({
+        address: testnet ? token.testnet : token.mainnet,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [address],
+      }),
+    ),
   ]);
 
   const ethEntry: LayerBalance =
     ethResult.status === "fulfilled"
-      ? { ...ethBase, balance: BigInt(ethResult.value) }
+      ? { ...ethBase, balance: ethResult.value }
       : { ...ethBase, error: ethResult.reason instanceof Error ? ethResult.reason.message : String(ethResult.reason) };
 
-  const tbtcEntry: LayerBalance =
-    tbtcResult.status === "fulfilled"
-      ? { ...tbtcBase, balance: BigInt(tbtcResult.value) }
-      : { ...tbtcBase, error: tbtcResult.reason instanceof Error ? tbtcResult.reason.message : String(tbtcResult.reason) };
+  const tokenEntries: LayerBalance[] = tokenResults.map((result, i) =>
+    result.status === "fulfilled"
+      ? { ...tokenBases[i], balance: result.value as bigint }
+      : { ...tokenBases[i], error: result.reason instanceof Error ? result.reason.message : String(result.reason) },
+  );
 
-  return [ethEntry, tbtcEntry];
+  return [ethEntry, ...tokenEntries];
 }

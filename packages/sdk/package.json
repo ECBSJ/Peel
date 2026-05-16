@@ -19,15 +19,18 @@
     }
   },
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@peelbtc/core": "workspace:*",
     "@peelbtc/types": "workspace:*",
-    "@peelbtc/core": "workspace:*"
+    "viem": "^2.49.0"
   }
 }

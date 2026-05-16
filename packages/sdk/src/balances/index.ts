@@ -95,7 +95,7 @@ export async function fetchBalances(
         ? fetchStacksBalances(stacksAddress, stacksRpc, isTestnet)
         : Promise.resolve([] as LayerBalance[]),
       evmAddress
-        ? fetchBobBalances(evmAddress, bobRpc, isTestnet)
+        ? fetchBobBalances(evmAddress as `0x${string}`, isTestnet, undefined, bobRpc)
         : Promise.resolve([] as LayerBalance[]),
       evmAddress
         ? fetchRootstockBalance(evmAddress, rootstockRpc, isTestnet)

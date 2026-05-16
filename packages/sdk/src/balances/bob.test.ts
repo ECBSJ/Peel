@@ -1,124 +1,190 @@
+// ---------------------------------------------------------------------------
+// bob.test.ts — unit tests for fetchBobBalances
+//
+// Strategy: mock the evm-client module so createEvmClient returns a
+// fake PublicClient with controlled getBalance / readContract responses.
+// This keeps tests fast and offline — no real RPC calls.
+// ---------------------------------------------------------------------------
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchBobBalances } from "../balances/bob.js";
-import { TBTC_BOB, BALANCE_OF_SELECTOR } from "../balances/contracts.js";
+import { fetchBobBalances, BOB_WRAPPED_BTC_TOKENS, type BobWrappedBtcToken } from "../balances/bob.js";
+import type { Address } from "viem";
 
-const RPC_URL = "https://rpc.gobob.xyz";
-const MOCK_ADDRESS = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+const MOCK_ADDRESS: Address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
 
-// eth_getBalance response: 0.1 ETH in wei
-const ETH_WEI_HEX = "0x16345785d8a0000"; // 100_000_000_000_000_000n
+// 0.1 ETH in wei
+const ETH_BALANCE = 100_000_000_000_000_000n;
+// 0.05 wBTC in smallest unit (8 decimals = 5_000_000 sats)
+const WBTC_BALANCE = 5_000_000n;
 
-// tBTC balanceOf response: 0.05 tBTC in wei
-const TBTC_WEI_HEX = "0xb1a2bc2ec50000"; // 50_000_000_000_000_000n
+// ---------------------------------------------------------------------------
+// Mock evm-client — return a fake PublicClient for all tests
+// ---------------------------------------------------------------------------
 
-function mockFetch(ethHex: string, tbtcHex: string) {
-  let callCount = 0;
-  return vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
-    const body = JSON.parse((init?.body as string) ?? "{}");
-    if (body.method === "eth_getBalance") {
-      return { ok: true, json: async () => ({ result: ethHex }) };
-    }
-    if (body.method === "eth_call") {
-      return { ok: true, json: async () => ({ result: tbtcHex }) };
-    }
-    callCount++;
-    return { ok: false, status: 400, statusText: "Bad Request" };
-  });
-}
+const mockGetBalance = vi.fn();
+const mockReadContract = vi.fn();
+
+vi.mock("../balances/evm-client.js", () => ({
+  createEvmClient: () => ({
+    getBalance: mockGetBalance,
+    readContract: mockReadContract,
+  }),
+}));
 
 beforeEach(() => {
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  mockGetBalance.mockResolvedValue(ETH_BALANCE);
+  mockReadContract.mockResolvedValue(WBTC_BALANCE);
 });
 
-describe("fetchBobBalances", () => {
-  it("returns two entries: ETH and tBTC", async () => {
-    vi.stubGlobal("fetch", mockFetch(ETH_WEI_HEX, TBTC_WEI_HEX));
+// ---------------------------------------------------------------------------
+// Mainnet tests
+// ---------------------------------------------------------------------------
 
-    const results = await fetchBobBalances(MOCK_ADDRESS, RPC_URL, false);
+describe("fetchBobBalances — mainnet", () => {
+  it("returns ETH entry + one entry per wrapped BTC token", async () => {
+    const results = await fetchBobBalances(MOCK_ADDRESS, false);
 
-    expect(results).toHaveLength(2);
-    expect(results.find((r) => r.asset === "ETH")).toBeDefined();
-    expect(results.find((r) => r.asset === "tBTC")).toBeDefined();
+    // 1 ETH + 1 default token (wBTC)
+    expect(results).toHaveLength(1 + BOB_WRAPPED_BTC_TOKENS.length);
   });
 
-  it("ETH entry: correct balance, decimals, isBtc=false", async () => {
-    vi.stubGlobal("fetch", mockFetch(ETH_WEI_HEX, TBTC_WEI_HEX));
-
-    const results = await fetchBobBalances(MOCK_ADDRESS, RPC_URL, false);
+  it("ETH entry: correct fields, isBtc=false", async () => {
+    const results = await fetchBobBalances(MOCK_ADDRESS, false);
     const eth = results.find((r) => r.asset === "ETH")!;
 
-    expect(eth.balance).toBe(100_000_000_000_000_000n);
+    expect(eth).toBeDefined();
+    expect(eth.balance).toBe(ETH_BALANCE);
     expect(eth.decimals).toBe(18);
     expect(eth.isBtc).toBe(false);
     expect(eth.kind).toBe("native");
     expect(eth.layer).toBe("bob");
+    expect(eth.testnet).toBe(false);
     expect(eth.error).toBeUndefined();
   });
 
-  it("tBTC entry: correct balance, decimals, isBtc=true", async () => {
-    vi.stubGlobal("fetch", mockFetch(ETH_WEI_HEX, TBTC_WEI_HEX));
+  it("wBTC entry: correct fields, isBtc=true", async () => {
+    const results = await fetchBobBalances(MOCK_ADDRESS, false);
+    const wbtc = results.find((r) => r.asset === "wBTC")!;
 
-    const results = await fetchBobBalances(MOCK_ADDRESS, RPC_URL, false);
-    const tbtc = results.find((r) => r.asset === "tBTC")!;
-
-    expect(tbtc.balance).toBe(50_000_000_000_000_000n);
-    expect(tbtc.decimals).toBe(18);
-    expect(tbtc.isBtc).toBe(true);
-    expect(tbtc.kind).toBe("token");
-    expect(tbtc.error).toBeUndefined();
+    expect(wbtc).toBeDefined();
+    expect(wbtc.balance).toBe(WBTC_BALANCE);
+    expect(wbtc.decimals).toBe(8);
+    expect(wbtc.isBtc).toBe(true);
+    expect(wbtc.kind).toBe("token");
+    expect(wbtc.layer).toBe("bob");
+    expect(wbtc.testnet).toBe(false);
+    expect(wbtc.error).toBeUndefined();
   });
 
-  it("encodes balanceOf call data correctly", async () => {
-    const fetchMock = mockFetch(ETH_WEI_HEX, TBTC_WEI_HEX);
-    vi.stubGlobal("fetch", fetchMock);
+  it("uses the mainnet contract address for readContract", async () => {
+    await fetchBobBalances(MOCK_ADDRESS, false);
 
-    await fetchBobBalances(MOCK_ADDRESS, RPC_URL, false);
-
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const ethCallRequest = calls.find((c) => {
-      const body = JSON.parse(c[1]?.body as string);
-      return body.method === "eth_call";
-    });
-
-    expect(ethCallRequest).toBeDefined();
-    const body = JSON.parse(ethCallRequest![1].body as string);
-    // data = BALANCE_OF_SELECTOR + address zero-padded to 32 bytes
-    expect(body.params[0].data).toMatch(new RegExp(`^${BALANCE_OF_SELECTOR}`));
-    expect(body.params[0].to).toBe(TBTC_BOB.mainnet);
+    expect(mockReadContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: BOB_WRAPPED_BTC_TOKENS[0].mainnet,
+        functionName: "balanceOf",
+        args: [MOCK_ADDRESS],
+      }),
+    );
   });
 
-  it("uses testnet tBTC contract when testnet=true", async () => {
-    const fetchMock = mockFetch(ETH_WEI_HEX, TBTC_WEI_HEX);
-    vi.stubGlobal("fetch", fetchMock);
+  it("supports multiple wrapped BTC tokens", async () => {
+    const customTokens: BobWrappedBtcToken[] = [
+      {
+        asset: "wBTC",
+        mainnet: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+        testnet: "0x0000000000000000000000000000000000000000",
+        decimals: 8,
+      },
+      {
+        asset: "tBTC",
+        mainnet: "0xBBa2eF945D523C4e2608C9E1214C2Cc64D4fc2e2",
+        testnet: "0x0000000000000000000000000000000000000000",
+        decimals: 18,
+      },
+    ];
 
-    await fetchBobBalances(MOCK_ADDRESS, RPC_URL, true);
+    mockReadContract
+      .mockResolvedValueOnce(5_000_000n)        // wBTC
+      .mockResolvedValueOnce(50_000_000_000_000_000n); // tBTC
 
-    const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
-    const ethCallRequest = calls.find((c) => {
-      const body = JSON.parse(c[1]?.body as string);
-      return body.method === "eth_call";
-    });
-    const body = JSON.parse(ethCallRequest![1].body as string);
-    expect(body.params[0].to).toBe(TBTC_BOB.testnet);
+    const results = await fetchBobBalances(MOCK_ADDRESS, false, customTokens);
+
+    expect(results).toHaveLength(3); // ETH + wBTC + tBTC
+    expect(results.find((r) => r.asset === "wBTC")?.balance).toBe(5_000_000n);
+    expect(results.find((r) => r.asset === "tBTC")?.balance).toBe(50_000_000_000_000_000n);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Testnet tests
+// ---------------------------------------------------------------------------
+
+describe("fetchBobBalances — testnet (bobSepolia)", () => {
+  it("sets testnet=true on all entries", async () => {
+    const results = await fetchBobBalances(MOCK_ADDRESS, true);
+
+    for (const entry of results) {
+      expect(entry.testnet).toBe(true);
+    }
   });
 
-  it("isolates ETH error from tBTC — tBTC can still succeed", async () => {
-    let callCount = 0;
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse((init?.body as string) ?? "{}");
-      if (body.method === "eth_getBalance") {
-        return { ok: false, status: 503, statusText: "Service Unavailable" };
-      }
-      return { ok: true, json: async () => ({ result: TBTC_WEI_HEX }) };
-    }));
+  it("uses the testnet contract address for readContract", async () => {
+    await fetchBobBalances(MOCK_ADDRESS, true);
 
-    const results = await fetchBobBalances(MOCK_ADDRESS, RPC_URL, false);
+    expect(mockReadContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: BOB_WRAPPED_BTC_TOKENS[0].testnet,
+        functionName: "balanceOf",
+        args: [MOCK_ADDRESS],
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error isolation
+// ---------------------------------------------------------------------------
+
+describe("fetchBobBalances — error handling", () => {
+  it("ETH failure is isolated — token entries still succeed", async () => {
+    mockGetBalance.mockRejectedValue(new Error("RPC unavailable"));
+    mockReadContract.mockResolvedValue(WBTC_BALANCE);
+
+    const results = await fetchBobBalances(MOCK_ADDRESS, false);
     const eth = results.find((r) => r.asset === "ETH")!;
-    const tbtc = results.find((r) => r.asset === "tBTC")!;
+    const wbtc = results.find((r) => r.asset === "wBTC")!;
 
     expect(eth.balance).toBe(0n);
-    expect(eth.error).toContain("503");
-    expect(tbtc.balance).toBe(50_000_000_000_000_000n);
-    expect(tbtc.error).toBeUndefined();
+    expect(eth.error).toBe("RPC unavailable");
+    expect(wbtc.balance).toBe(WBTC_BALANCE);
+    expect(wbtc.error).toBeUndefined();
+  });
+
+  it("token failure is isolated — ETH entry still succeeds", async () => {
+    mockGetBalance.mockResolvedValue(ETH_BALANCE);
+    mockReadContract.mockRejectedValue(new Error("contract call failed"));
+
+    const results = await fetchBobBalances(MOCK_ADDRESS, false);
+    const eth = results.find((r) => r.asset === "ETH")!;
+    const wbtc = results.find((r) => r.asset === "wBTC")!;
+
+    expect(eth.balance).toBe(ETH_BALANCE);
+    expect(eth.error).toBeUndefined();
+    expect(wbtc.balance).toBe(0n);
+    expect(wbtc.error).toBe("contract call failed");
+  });
+
+  it("balance is 0n (not undefined) when a fetch fails", async () => {
+    mockGetBalance.mockRejectedValue(new Error("timeout"));
+    mockReadContract.mockRejectedValue(new Error("timeout"));
+
+    const results = await fetchBobBalances(MOCK_ADDRESS, false);
+
+    for (const entry of results) {
+      expect(entry.balance).toBe(0n);
+      expect(entry.error).toBeDefined();
+    }
   });
 });
