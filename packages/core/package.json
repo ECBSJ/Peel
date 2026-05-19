@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@peelbtc/types": "workspace:*",
-    "@stacks/transactions": "^7.4.0"
+    "@stacks/transactions": "^7.4.0",
+    "dotenv": "^17.4.2"
   }
 }

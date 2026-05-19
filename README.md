@@ -2,6 +2,8 @@
 
 > *Send sats, not complexity.*
 
+![Peel](./assets/Concept-v1-cover.png)
+
 Peel is a unified Bitcoin payment routing SDK. It abstracts away the fragmentation of Bitcoin's Layer 1 and Layer 2 ecosystem — different address formats, transaction models, and wrapped BTC representations — into a single, clean developer interface.
 
 Developers describe what they want to pay. Peel figures out how.

@@ -91,9 +91,8 @@ describe("hashBitcoinMessage", () => {
 
 describe("recoverPublicKey", () => {
   it("recovers public key from an OWS signature", () => {
-    const owsAddress = "bc1qrk3txtstlpdffr3lss4nq3x0rfs7nhcqqpr33k"
-    let owsPubKey = "0365b706e3ab5ece1c73f6a7a21626871b2c43919ff87599abe887a29343484524"
-    let owsPrivKey = "Kz6YweubWZNr3BB6CyRPiN5QNZPL19PpaEqhUGPspBz2JbeEf5TS"
+    const owsAddress = process.env.OWS_BITCOIN!
+    let owsPubKey = process.env.OWS_PUBKEY!
 
     const message = "bitcoin";
     let msgHash = "9206313371d3609df9d62b0e24026d6ac518c128f74640b4189c7f3aeb280c09"
