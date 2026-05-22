@@ -198,6 +198,11 @@ export function serializeBobTx(tx: EvmTxPrepared): Hex {
  * OWS returns signature as hex(r[32] || s[32] || v[1]).
  * viem's serializeTransaction accepts { r, s, v } to produce the final blob.
  *
+ * v conventions: OWS returns the raw ECDSA recovery ID (0 or 1); legacy
+ * Ethereum signers (e.g. viem's `sign`) return v offset by 27 (27 or 28).
+ * viem's serializeTransaction normalises both — 0/1 and 27/28 — down to
+ * yParity (0 or 1) before RLP-encoding, so either convention is accepted here.
+ *
  * @param tx     The same prepared tx that was serialized for signing
  * @param sig    SignResult from OWS sign_transaction
  */

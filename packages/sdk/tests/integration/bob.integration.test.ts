@@ -39,14 +39,15 @@ import { fetchBobBalances, BOB_WRAPPED_BTC_TOKENS } from "../../src/balances/bob
 
 // A known address with onchain activity on BOB mainnet — used for read-only
 // tests. Replace with your own if desired.
-const PROBE_ADDRESS = "0x32F249180D2d91A3a8EcAeBE9283Bde3C8903986" as Hex;
+// @ts-ignore
+const PROBE_ADDRESS = process.env.OWS_BRID_EVM as Hex;
 
 // For signing + broadcast tests: set TEST_PRIVATE_KEY in your environment.
 // Use a throwaway key. testnet (bobSepolia) funds only.
 //   export TEST_PRIVATE_KEY=0x<64 hex chars>
 // @ts-ignore
-const TEST_PRIVATE_KEY = process.env.TEST_PRIVATE_KEY as Hex | undefined;
-const TEST_RECIPIENT = "0x1111111111111111111111111111111111111111" as Hex;
+const TEST_PRIVATE_KEY = `0x${process.env.OWS_PRIVKEY}` as Hex | undefined;
+const TEST_RECIPIENT = "0x32F249180D2d91A3a8EcAeBE9283Bde3C8903986" as Hex;
 
 // Skip signing/broadcast tests if no key is provided
 const skipIfNoKey = !TEST_PRIVATE_KEY;
@@ -79,6 +80,9 @@ async function signBobTxWithPrivateKey(
 
   // Hash the serialized bytes — what OWS keccak256's internally
   const hash = keccak256(unsignedHex);
+
+  console.log("=== keccak256 hash of unsigned hex ===")
+  console.log(hash)
 
   // Sign the hash with the raw private key
   const { r, s, v } = await sign({ hash, privateKey });
@@ -130,6 +134,9 @@ describe.skipIf(process.env.CI)("BOB integration", () => {
       false,
     );
 
+    console.log("=== Encoded Function Data ===")
+    console.log(intent.data)
+
     const prepared = await prepareBobTx(intent, false);
 
     console.log("\n=== Prepared tx fields ===");
@@ -158,100 +165,100 @@ describe.skipIf(process.env.CI)("BOB integration", () => {
   // 3. Sign with a raw private key — shows r, s, v for external comparison
   // -------------------------------------------------------------------------
 
-  // it.skipIf(skipIfNoKey)(
-  //   "signBobTxWithPrivateKey returns r, s, v — compare against OWS output",
-  //   async () => {
-  //     const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
+  it.skipIf(skipIfNoKey)(
+    "signBobTxWithPrivateKey returns r, s, v — compare against OWS output",
+    async () => {
+      const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
 
-  //     const intent = buildBobTokenTransfer(
-  //       sender,
-  //       TEST_RECIPIENT,
-  //       BOB_WRAPPED_BTC_TOKENS[0].testnet,
-  //       1n,
-  //       true, // bobSepolia — use testnet for signing tests
-  //     );
+      const intent = buildBobTokenTransfer(
+        sender,
+        TEST_RECIPIENT,
+        BOB_WRAPPED_BTC_TOKENS[0].mainnet,
+        1n,
+        false, // bobSepolia — use testnet for signing tests
+      );
 
-  //     const prepared = await prepareBobTx(intent, true);
-  //     const unsignedHex = serializeBobTx(prepared);
-  //     const { r, s, v, owsSig } = await signBobTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
+      const prepared = await prepareBobTx(intent, false);
+      const unsignedHex = serializeBobTx(prepared);
+      const { r, s, v, owsSig } = await signBobTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
 
-  //     console.log("\n=== Signature components ===");
-  //     console.log("  (compare these against OWS sign_transaction output)");
-  //     console.log("  r:", r);
-  //     console.log("  s:", s);
-  //     console.log("  v:", v.toString());
-  //     console.log("\n=== OWS-format signature (hex(r||s||v)) ===");
-  //     console.log(" ", owsSig.signature);
-  //     console.log("\n=== Unsigned tx (input to signer) ===");
-  //     console.log(" ", unsignedHex);
+      console.log("\n=== Signature components ===");
+      console.log("  (compare these against OWS sign_transaction output)");
+      console.log("  r:", r);
+      console.log("  s:", s);
+      console.log("  v:", v!.toString());
+      console.log("\n=== OWS-format signature (hex(r||s||v)) ===");
+      console.log(" ", owsSig.signature);
+      console.log("\n=== Unsigned tx (input to signer) ===");
+      console.log(" ", unsignedHex);
 
-  //     expect(r).toMatch(/^0x[0-9a-f]{64}$/i);
-  //     expect(s).toMatch(/^0x[0-9a-f]{64}$/i);
-  //     expect(v === 27n || v === 28n).toBe(true);
-  //     expect(owsSig.signature).toHaveLength(130); // 65 bytes = 130 hex chars
-  //   },
-  //   15_000,
-  // );
+      expect(r).toMatch(/^0x[0-9a-f]{64}$/i);
+      expect(s).toMatch(/^0x[0-9a-f]{64}$/i);
+      expect(v === 27n || v === 28n).toBe(true);
+      expect(owsSig.signature).toHaveLength(130); // 65 bytes = 130 hex chars
+    },
+    15_000,
+  );
 
   // -------------------------------------------------------------------------
   // 4. Encode final signed tx payload
   // -------------------------------------------------------------------------
 
-  // it.skipIf(skipIfNoKey)(
-  //   "encodeBobSignedTx attaches signature and produces broadcast-ready 0x02... blob",
-  //   async () => {
-  //     const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
+  it.skipIf(skipIfNoKey)(
+    "encodeBobSignedTx attaches signature and produces broadcast-ready 0x02... blob",
+    async () => {
+      const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
 
-  //     const intent = buildBobTokenTransfer(
-  //       sender,
-  //       TEST_RECIPIENT,
-  //       BOB_WRAPPED_BTC_TOKENS[0].testnet,
-  //       1n,
-  //       true,
-  //     );
+      const intent = buildBobTokenTransfer(
+        sender,
+        TEST_RECIPIENT,
+        BOB_WRAPPED_BTC_TOKENS[0].mainnet,
+        1n,
+        false,
+      );
 
-  //     const prepared = await prepareBobTx(intent, true);
-  //     const { owsSig } = await signBobTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
-  //     const signedHex = encodeBobSignedTx(prepared, owsSig);
+      const prepared = await prepareBobTx(intent, false);
+      const { owsSig } = await signBobTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
+      const signedHex = encodeBobSignedTx(prepared, owsSig);
 
-  //     console.log("\n=== Signed tx (broadcast-ready) ===");
-  //     console.log("  (paste into Etherscan > Broadcast or use sendRawTransaction)");
-  //     console.log(" ", signedHex);
+      console.log("\n=== Signed tx (broadcast-ready) ===");
+      console.log("  (paste into Etherscan > Broadcast or use sendRawTransaction)");
+      console.log(" ", signedHex);
 
-  //     expect(signedHex.startsWith("0x02")).toBe(true);
-  //     expect(signedHex.length).toBeGreaterThan(serializeBobTx(prepared).length);
-  //   },
-  //   15_000,
-  // );
+      expect(signedHex.startsWith("0x02")).toBe(true);
+      expect(signedHex.length).toBeGreaterThan(serializeBobTx(prepared).length);
+    },
+    15_000,
+  );
 
   // -------------------------------------------------------------------------
   // 5. Broadcast — sends the tx and returns a real tx hash
   // -------------------------------------------------------------------------
 
-  // it.skipIf(skipIfNoKey)(
-  //   "broadcastBobTx submits to bobSepolia and returns a tx hash",
-  //   async () => {
-  //     const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
+  it.skipIf(skipIfNoKey)(
+    "broadcastBobTx submits to BOB mainnet and returns a tx hash",
+    async () => {
+      const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
 
-  //     const intent = buildBobTokenTransfer(
-  //       sender,
-  //       TEST_RECIPIENT,
-  //       BOB_WRAPPED_BTC_TOKENS[0].testnet,
-  //       1n,
-  //       true,
-  //     );
+      const intent = buildBobTokenTransfer(
+        sender,
+        TEST_RECIPIENT,
+        BOB_WRAPPED_BTC_TOKENS[0].mainnet,
+        1n,
+        false,
+      );
 
-  //     const prepared = await prepareBobTx(intent, true);
-  //     const { owsSig } = await signBobTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
-  //     const signedHex = encodeBobSignedTx(prepared, owsSig);
-  //     const txHash = await broadcastBobTx(signedHex, true);
+      const prepared = await prepareBobTx(intent, false);
+      const { owsSig } = await signBobTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
+      const signedHex = encodeBobSignedTx(prepared, owsSig);
+      const txHash = await broadcastBobTx(signedHex, false);
 
-  //     console.log("\n=== Broadcast result ===");
-  //     console.log("  tx hash:", txHash);
-  //     console.log(`  explorer: https://bob-sepolia.explorer.gobob.xyz/tx/${txHash}`);
+      console.log("\n=== Broadcast result ===");
+      console.log("  tx hash:", txHash);
+      console.log(`  explorer: https://explorer.gobob.xyz/tx/${txHash}`);
 
-  //     expect(txHash).toMatch(/^0x[0-9a-f]{64}$/i);
-  //   },
-  //   30_000,
-  // );
+      expect(txHash).toMatch(/^0x[0-9a-f]{64}$/i);
+    },
+    30_000,
+  );
 });
