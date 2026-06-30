@@ -1,13 +1,53 @@
 ---
 name: peel
-description: "Derive Bitcoin L2 addresses (Stacks, EVM, Bitcoin P2WPKH) from a single secp256k1 public key using BRID (Bitcoin-Rooted Identity Derivation). Use when: deriving layer addresses from a Bitcoin wallet, recovering a public key from a Bitcoin message signature, building a BRID identity map, or working with @peelbtc/core."
+description: "Use the Peel SDK to route Bitcoin payments across L1 and L2s, derive layer addresses via BRID, fetch multi-chain balances, and build/sign/broadcast EVM transactions. Use when: working with @peelbtc/core (identity derivation), @peelbtc/sdk (balances, BOB transfers), or integrating OWS signing with Peel's EVM encoding path."
 ---
 
-# Peel — Bitcoin-Rooted Identity Derivation (BRID)
+# Peel — A Payments Engine for Every Layer
 
-Derive Stacks, EVM, and Bitcoin P2WPKH addresses from a single compressed secp256k1 public key. Recover the public key from a Bitcoin message signature when the wallet can't expose it directly.
+Peel is a unified Bitcoin payment routing SDK. Developers describe what they want to pay — Peel figures out which network, which asset, and how to route it. The goal is for callers to think in sats, not in chain-specific mechanics.
 
-## When to use
+> *Send sats, not complexity.*
+
+## Product Context
+
+Bitcoin's L2 ecosystem fragments identity, addresses, and BTC representations across multiple chains. Peel's job is to abstract that away through three ideas:
+
+1. **Bitcoin-native identity (BRID)** — all chain addresses derive from a single secp256k1 public key rooted in a Bitcoin P2WPKH address. No chain-specific keys.
+2. **Balance orchestration** — fetch BTC-denominated balances across all supported layers in one call.
+3. **Transaction routing** — build, sign, and broadcast transactions on each chain without exposing private keys.
+
+## Package Boundaries
+
+```
+@peelbtc/types   ← shared interfaces, zero logic
+      ↑
+@peelbtc/core    ← pure crypto: address derivation, BRID identity recovery
+      ↑
+@peelbtc/sdk     ← balance orchestration, chain adapters, transaction helpers
+      ↑
+@peelbtc/mcp     ← MCP server for AI agent payment routing (planned)
+```
+
+Each package only imports from packages below it. `@peelbtc/core` has no chain SDK dependencies.
+
+## Security Constraints
+
+- Peel never handles private keys — signing always happens outside the SDK via a signer (OWS, MetaMask, etc.)
+- The `SignerAdapter` boundary is a hard guarantee — Peel receives unsigned tx bytes, passes them to the signer, and receives a signature back
+
+## When to Use Which Package
+
+| Task | Package |
+|------|---------|
+| Derive Bitcoin / Stacks / EVM address from pubkey | `@peelbtc/core` |
+| Recover pubkey from a Bitcoin message signature | `@peelbtc/core` |
+| Build a BRID identity map from OWS wallet | `@peelbtc/core` |
+| Fetch balances across all layers | `@peelbtc/sdk` |
+| Build + broadcast a BOB ERC-20 transfer | `@peelbtc/sdk` |
+| Route a payment intent | `@peelbtc/sdk` (planned) |
+
+## When to use this skill
 
 Use this skill when the user asks to:
 
@@ -15,7 +55,9 @@ Use this skill when the user asks to:
 - Build a BRID identity map from a Bitcoin address + message signature
 - Recover a secp256k1 public key from a Bitcoin message signature
 - Hash a message using Bitcoin's message signing format
-- Work with `@peelbtc/core` in code
+- Fetch multi-layer BTC balances
+- Build or broadcast a BOB wBTC transfer with OWS signing
+- Work with `@peelbtc/core` or `@peelbtc/sdk` in code
 
 ## Prerequisites
 
@@ -140,4 +182,5 @@ OWS `sign message --json` output:
 
 ## Full reference
 
-See `./references/node.md` for detailed API documentation.
+- `./references/core.md` — `@peelbtc/core` API: address derivation, BRID identity recovery, registry
+- `./references/sdk.md` — `@peelbtc/sdk` API: balance orchestration, BOB transaction helpers, integration tests
