@@ -84,7 +84,7 @@ describe.skipIf(process.env.CI)("Rootstock integration", () => {
     expect(result.balance).toBeGreaterThanOrEqual(0n);
   }, 15_000);
 
-  it("prepareRootstockTx returns fully populated fields and serializeRootstockTx produces 0x02... hex", async () => {
+  it("prepareRootstockTx returns fully populated fields and serializeRootstockTx produces a legacy hex tx", async () => {
     const intent = buildRootstockTransfer(
       PROBE_ADDRESS,
       TEST_RECIPIENT,
@@ -98,15 +98,14 @@ describe.skipIf(process.env.CI)("Rootstock integration", () => {
     console.log("  chainId:              ", prepared.chainId);
     console.log("  nonce:                ", prepared.nonce);
     console.log("  gas:                  ", prepared.gas.toString());
-    console.log("  maxFeePerGas:         ", prepared.maxFeePerGas.toString(), "wei");
-    console.log("  maxPriorityFeePerGas: ", prepared.maxPriorityFeePerGas.toString(), "wei");
+    console.log("  gasPrice:             ", prepared.gasPrice.toString(), "wei");
 
     const unsignedHex = serializeRootstockTx(prepared);
 
     expect(prepared.nonce).toBeGreaterThanOrEqual(0);
     expect(prepared.gas).toBeGreaterThan(0n);
-    expect(prepared.maxFeePerGas).toBeGreaterThan(0n);
-    expect(unsignedHex.startsWith("0x02")).toBe(true);
+    expect(prepared.gasPrice).toBeGreaterThan(0n);
+    expect(unsignedHex.startsWith("0x02")).toBe(false);
   }, 15_000);
 
   it.skipIf(skipIfNoKey)(
@@ -139,7 +138,7 @@ describe.skipIf(process.env.CI)("Rootstock integration", () => {
   );
 
   it.skipIf(skipIfNoKey)(
-    "encodeRootstockSignedTx attaches signature and produces broadcast-ready 0x02... blob",
+    "encodeRootstockSignedTx attaches signature and produces broadcast-ready legacy tx",
     async () => {
       const sender = await senderFromPrivateKey(TEST_PRIVATE_KEY!);
 
@@ -154,7 +153,7 @@ describe.skipIf(process.env.CI)("Rootstock integration", () => {
       const { owsSig } = await signRootstockTxWithPrivateKey(prepared, TEST_PRIVATE_KEY!);
       const signedHex = encodeRootstockSignedTx(prepared, owsSig);
 
-      expect(signedHex.startsWith("0x02")).toBe(true);
+      expect(signedHex.startsWith("0x02")).toBe(false);
       expect(signedHex.length).toBeGreaterThan(serializeRootstockTx(prepared).length);
     },
     15_000,

@@ -37,9 +37,8 @@ export interface RootstockTxPrepared {
   chainId: number;
   nonce: number;
   gas: bigint;
-  maxFeePerGas: bigint;
-  maxPriorityFeePerGas: bigint;
-  type: "eip1559";
+  gasPrice: bigint;
+  type: "legacy";
 }
 
 export interface OwsSignResult {
@@ -74,8 +73,8 @@ export function buildRootstockTransfer(
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch live chain values (nonce, gas estimate, fee data) and return a fully
- * populated EIP-1559 transaction ready for serialization.
+ * Fetch live chain values (nonce, gas estimate, gas price) and return a fully
+ * populated legacy transaction ready for serialization.
  */
 export async function prepareRootstockTx(
   tx: RootstockTxRequest,
@@ -93,7 +92,7 @@ export async function prepareRootstockTx(
       value: tx.value,
       data: tx.data,
     }),
-    client.estimateFeesPerGas(),
+    client.getGasPrice(),
   ]);
 
   return {
@@ -104,9 +103,8 @@ export async function prepareRootstockTx(
     chainId: tx.chainId,
     nonce,
     gas: gasEstimate,
-    maxFeePerGas: feeData.maxFeePerGas,
-    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-    type: "eip1559",
+    gasPrice: feeData,
+    type: "legacy",
   };
 }
 

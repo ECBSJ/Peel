@@ -16,14 +16,14 @@ const TO: Address = "0x2222222222222222222222222222222222222222";
 
 const mockGetTransactionCount = vi.fn();
 const mockEstimateGas = vi.fn();
-const mockEstimateFeesPerGas = vi.fn();
+const mockGetGasPrice = vi.fn();
 const mockSendRawTransaction = vi.fn();
 
 vi.mock("../balances/evm-client.js", () => ({
   createEvmClient: () => ({
     getTransactionCount: mockGetTransactionCount,
     estimateGas: mockEstimateGas,
-    estimateFeesPerGas: mockEstimateFeesPerGas,
+    getGasPrice: mockGetGasPrice,
     sendRawTransaction: mockSendRawTransaction,
   }),
 }));
@@ -32,10 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetTransactionCount.mockResolvedValue(7);
   mockEstimateGas.mockResolvedValue(21_000n);
-  mockEstimateFeesPerGas.mockResolvedValue({
-    maxFeePerGas: 1_500_000_000n,
-    maxPriorityFeePerGas: 1_000_000n,
-  });
+  mockGetGasPrice.mockResolvedValue(1_500_000_000n);
   mockSendRawTransaction.mockResolvedValue(
     "0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1",
   );
@@ -66,24 +63,23 @@ describe("prepareRootstockTx", () => {
     chainId: rootstock.id,
   };
 
-  it("populates nonce, gas and fee fields", async () => {
+  it("populates nonce, gas and gasPrice fields", async () => {
     const prepared = await prepareRootstockTx(baseTx, false);
     expect(prepared.nonce).toBe(7);
     expect(prepared.gas).toBe(21_000n);
-    expect(prepared.maxFeePerGas).toBe(1_500_000_000n);
-    expect(prepared.maxPriorityFeePerGas).toBe(1_000_000n);
-    expect(prepared.type).toBe("eip1559");
+    expect(prepared.gasPrice).toBe(1_500_000_000n);
+    expect(prepared.type).toBe("legacy");
   });
 });
 
 describe("serializeRootstockTx", () => {
-  it("produces an EIP-1559 hex payload", async () => {
+  it("produces a legacy hex payload", async () => {
     const prepared = await prepareRootstockTx(
       { from: FROM, to: TO, value: 0n, data: "0x", chainId: rootstock.id },
       false,
     );
     const serialized = serializeRootstockTx(prepared);
-    expect(serialized.startsWith("0x02")).toBe(true);
+    expect(serialized.startsWith("0x02")).toBe(false);
   });
 });
 
@@ -96,9 +92,8 @@ describe("encodeRootstockSignedTx", () => {
     chainId: rootstock.id,
     nonce: 7,
     gas: 21_000n,
-    maxFeePerGas: 1_500_000_000n,
-    maxPriorityFeePerGas: 1_000_000n,
-    type: "eip1559" as const,
+    gasPrice: 1_500_000_000n,
+    type: "legacy" as const,
   };
 
   const sig: OwsSignResult = {
@@ -107,7 +102,7 @@ describe("encodeRootstockSignedTx", () => {
 
   it("produces a signed tx", () => {
     const signed = encodeRootstockSignedTx(preparedTx, sig);
-    expect(signed.startsWith("0x02")).toBe(true);
+    expect(signed.startsWith("0x02")).toBe(false);
     expect(signed.length).toBeGreaterThan(serializeRootstockTx(preparedTx).length);
   });
 
@@ -119,7 +114,7 @@ describe("encodeRootstockSignedTx", () => {
 });
 
 describe("broadcastRootstockTx", () => {
-  const signedHex = ("0x02f8" + "ab".repeat(50)) as `0x${string}`;
+  const signedHex = ("0xe3" + "ab".repeat(50)) as `0x${string}`;
 
   it("sends serialized tx and returns hash", async () => {
     const hash = await broadcastRootstockTx(signedHex, false);
