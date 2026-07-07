@@ -12,9 +12,8 @@
 // Conversion to satoshis: wei / 10^10
 //
 // ⚠️  VERIFY:
-//   - Citrea mainnet RPC URL: https://rpc.citrea.xyz  (chain 5115)
-//   - Citrea testnet RPC URL: https://rpc.devnet.citrea.xyz  (chain 62298)
-//   - Citrea mainnet may not be live yet — testnet is the primary network
+//   - Citrea mainnet RPC URL: https://rpc.mainnet.citrea.xyz  (chain 4114)
+//   - Citrea testnet RPC URL: https://rpc.testnet.citrea.xyz  (chain 5115)
 // ---------------------------------------------------------------------------
 
 import type { LayerBalance } from "@peelbtc/types";

@@ -32,6 +32,7 @@
   "dependencies": {
     "@peelbtc/core": "workspace:*",
     "@peelbtc/types": "workspace:*",
+    "@rsksmart/flyover-sdk": "^1.9.1",
     "viem": "^2.49.0"
   },
   "devDependencies": {

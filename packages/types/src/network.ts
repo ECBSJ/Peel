@@ -37,9 +37,9 @@ export enum Caip2 {
 
   // ---- Citrea (eip155) ---------------------------------------------------
   /** Citrea mainnet */
-  CitreaMainnet   = "eip155:5115",
+  CitreaMainnet   = "eip155:4114",
   /** Citrea testnet */
-  CitreaTestnet   = "eip155:62298",
+  CitreaTestnet   = "eip155:5115",
 }
 
 // ---------------------------------------------------------------------------
