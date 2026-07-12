@@ -21,7 +21,17 @@ export {
   encodeCitreaSignedTx,
   broadcastCitreaTx,
 } from "./transactions/citrea.js";
-export { RootstockFlyoverBridgeAdapter } from "./bridges/rootstock-flyover.js";
+export {
+  RootstockFlyoverBridgeAdapter,
+  FLYOVER_LBC_ADDRESS,
+  FLYOVER_LIMITS,
+} from "./bridges/rootstock-flyover.js";
+export type {
+  PegInPaymentPlan,
+  RegisterPegInInfo,
+  RootstockFlyoverAdapterOptions,
+  RootstockPegoutQuoteResult,
+} from "./bridges/rootstock-flyover.js";
 export type { EvmTxRequest, EvmTxPrepared, OwsSignResult } from "./transactions/bob.js";
 export type {
   RootstockTxRequest,
