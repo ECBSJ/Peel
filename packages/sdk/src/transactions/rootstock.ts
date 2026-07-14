@@ -134,7 +134,14 @@ export function encodeRootstockSignedTx(
 
   const r = `0x${sigBytes.slice(0, 64)}` as Hex;
   const s = `0x${sigBytes.slice(64, 128)}` as Hex;
-  const v = BigInt(`0x${sigBytes.slice(128, 130)}`);
+
+  // OWS `sign tx` returns a raw recovery ID (0 or 1) as the last byte.
+  // Some signers (e.g. viem) return the legacy Ethereum form (27 or 28).
+  // Normalize to a raw recovery ID, then compute the EIP-155 v for legacy txs:
+  //   v = chainId * 2 + 35 + recoveryId
+  const rawV = BigInt(`0x${sigBytes.slice(128, 130)}`);
+  const recoveryId = rawV === 27n || rawV === 28n ? rawV - 27n : rawV;
+  const v = BigInt(tx.chainId) * 2n + 35n + recoveryId;
 
   const { from: _from, ...txFields } = tx;
   return serializeTransaction(txFields, { r, s, v });

@@ -258,6 +258,33 @@ Test coverage:
 
 ---
 
+## Rootstock Signing Notes
+
+### Use `ows sign tx`, not `ows sign send-tx`
+
+Peel serializes Rootstock transactions as **unsigned legacy (type 0) EVM transactions** — no `0x01`/`0x02` type prefix. OWS's `sign send-tx` path expects a typed transaction and will reject legacy hex. Always use `ows sign tx` for Rootstock:
+
+```bash
+# Serialize the unsigned tx via Peel, then sign with OWS:
+ows sign tx --wallet <name> --chain evm --tx <unsignedHex> --json
+# Returns: { recovery_id: 0|1, signature: "<hex r||s||v>" }
+```
+
+### EIP-155 `v` is handled internally
+
+`encodeRootstockSignedTx` automatically converts the raw recovery ID (`0`/`1`) from OWS into the EIP-155 legacy `v` value required by Rootstock:
+
+```
+v = chainId * 2 + 35 + recoveryId
+```
+
+For Rootstock mainnet (chainId 30): `v` = 95 or 96  
+For Rootstock testnet (chainId 31): `v` = 97 or 98
+
+Passing the raw OWS signature directly to `encodeRootstockSignedTx` is correct — no manual conversion needed. Both raw recovery IDs (`0`/`1`) and legacy Ethereum form (`27`/`28`) are accepted.
+
+---
+
 ## Known Caveats
 
 - Some testnet token addresses are placeholders marked with `⚠️ VERIFY` comments in source

@@ -43,8 +43,4 @@ export type {
   CitreaTxPrepared,
   OwsSignResult as CitreaOwsSignResult,
 } from "./transactions/citrea.js";
-export type {
-  RootstockFlyoverAdapterOptions,
-  RootstockPegoutQuoteResult,
-} from "./bridges/rootstock-flyover.js";
 export type { BalanceMap, LayerBalance, RpcOverrides, BalanceKind } from "@peelbtc/types";
