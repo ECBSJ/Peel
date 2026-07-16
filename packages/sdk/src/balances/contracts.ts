@@ -5,8 +5,6 @@
 // via contract calls (ERC-20 balanceOf, SIP-010 get-balance).
 //
 // ⚠️  VERIFY BEFORE PRODUCTION USE:
-//   - SBTC.testnet: confirm current sBTC testnet contract address with
-//     Stacks Foundation / sBTC working group
 //   - TBTC_BOB.testnet: confirm tBTC v2 contract on BOB testnet (chain 808)
 //     against https://github.com/thesis/tbtc-v2 deployment registry
 //   - TBTC_BOB.mainnet: confirm against same registry for BOB mainnet (chain 60808)
@@ -19,10 +17,10 @@
  * GET /extended/v1/address/{addr}/balances (Hiro API).
  */
 export const SBTC = {
-  /** sBTC v2 mainnet — deployed by Stacks Foundation. VERIFY: SP...sbtc-token */
-  mainnet: "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sbtc-token",
-  /** sBTC testnet — PLACEHOLDER: verify current testnet deployment address */
-  testnet: "ST3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sbtc-token",
+  /** sBTC v2 mainnet — deployed by Stacks Foundation. */
+  mainnet: "SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token",
+  /** sBTC v2 testnet — deployed by Stacks Foundation. */
+  testnet: "ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token",
 } as const;
 
 /**

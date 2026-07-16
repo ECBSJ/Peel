@@ -60,6 +60,9 @@ importers:
       '@rsksmart/flyover-sdk':
         specifier: ^1.9.1
         version: 1.9.1
+      '@stacks/transactions':
+        specifier: ^7.4.0
+        version: 7.4.0
       viem:
         specifier: ^2.49.0
         version: 2.49.0(typescript@6.0.2)

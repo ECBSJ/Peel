@@ -33,6 +33,7 @@
     "@peelbtc/core": "workspace:*",
     "@peelbtc/types": "workspace:*",
     "@rsksmart/flyover-sdk": "^1.9.1",
+    "@stacks/transactions": "^7.4.0",
     "viem": "^2.49.0"
   },
   "devDependencies": {

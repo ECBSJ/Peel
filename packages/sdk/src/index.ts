@@ -22,6 +22,13 @@ export {
   broadcastCitreaTx,
 } from "./transactions/citrea.js";
 export {
+  buildStxTransfer,
+  buildSbtcTransfer,
+  prepareStacksTx,
+  encodeStacksSignedTx,
+  broadcastStacksTx,
+} from "./transactions/stacks.js";
+export {
   RootstockFlyoverBridgeAdapter,
   FLYOVER_LBC_ADDRESS,
   FLYOVER_LIMITS,
@@ -43,4 +50,9 @@ export type {
   CitreaTxPrepared,
   OwsSignResult as CitreaOwsSignResult,
 } from "./transactions/citrea.js";
+export type {
+  StacksTxRequest,
+  StacksTxPrepared,
+  OwsSignResult as StacksOwsSignResult,
+} from "./transactions/stacks.js";
 export type { BalanceMap, LayerBalance, RpcOverrides, BalanceKind } from "@peelbtc/types";
