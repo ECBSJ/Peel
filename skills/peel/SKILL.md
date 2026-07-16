@@ -186,3 +186,4 @@ OWS `sign message --json` output:
 - `./references/sdk.md` — `@peelbtc/sdk` API: balance orchestration, BOB transaction helpers, integration tests
 - `./references/bridging/bob-gateway.md` — BOB Gateway CLI: BTC ↔ EVM bridge, unsigned mode for agent signing, relationship to Peel SDK
 - `./references/bridging/rootstock-flyover.md` — Rootstock Flyover: BTC ↔ rBTC bridge via LP liquidity, peg-in/peg-out flows, validation, recovery, limits
+- `./references/bridging/sbtc.md` — sBTC Bridge: BTC ↔ sBTC on Stacks (mainnet), peg-in deposit plan + Emily notify, peg-out Stacks contract call, reclaimPublicKey derivation

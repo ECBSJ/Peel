@@ -33,6 +33,20 @@ export {
   FLYOVER_LBC_ADDRESS,
   FLYOVER_LIMITS,
 } from "./bridges/rootstock-flyover.js";
+export {
+  buildSbtcDepositPlan,
+  notifySbtcDeposit,
+  pollSbtcDepositStatus,
+  prepareSbtcWithdrawalTx,
+  pollSbtcWithdrawalStatus,
+  decodeBtcAddress,
+} from "./bridges/sbtc.js";
+export type {
+  SbtcDepositPlan,
+  SbtcNotifyResponse,
+  SbtcDepositStatusEntry,
+  SbtcWithdrawalStatusEntry,
+} from "./bridges/sbtc.js";
 export type {
   PegInPaymentPlan,
   RegisterPegInInfo,
