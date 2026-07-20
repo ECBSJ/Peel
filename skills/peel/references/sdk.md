@@ -4,13 +4,29 @@
 
 ```javascript
 import {
+  // Balances
   fetchBalances,
-  buildBobEthTransfer,
-  buildBobTokenTransfer,
-  prepareBobTx,
-  serializeBobTx,
-  encodeBobSignedTx,
-  broadcastBobTx,
+
+  // BOB (EIP-1559, type 2)
+  buildBobEthTransfer, buildBobTokenTransfer,
+  prepareBobTx, serializeBobTx, encodeBobSignedTx, broadcastBobTx,
+
+  // Rootstock (legacy type 0)
+  buildRootstockTransfer,
+  prepareRootstockTx, serializeRootstockTx, encodeRootstockSignedTx, broadcastRootstockTx,
+
+  // Citrea (EIP-1559, type 2)
+  buildCitreaTransfer,
+  prepareCitreaTx, serializeCitreaTx, encodeCitreaSignedTx, broadcastCitreaTx,
+
+  // Stacks (secp256k1, same curve as Bitcoin)
+  buildStxTransfer, buildSbtcTransfer,
+  prepareStacksTx, encodeStacksSignedTx, broadcastStacksTx,
+
+  // Bridges
+  RootstockFlyoverBridgeAdapter, FLYOVER_LBC_ADDRESS, FLYOVER_LIMITS,
+  buildSbtcDepositPlan, notifySbtcDeposit, pollSbtcDepositStatus,
+  prepareSbtcWithdrawalTx, pollSbtcWithdrawalStatus,
 } from "/Users/eric/Code/Peel/packages/sdk/dist/index.js";
 ```
 
@@ -32,18 +48,55 @@ All code must use `--input-type=module` or run inside an ESM context.
 
 ## Public Exports
 
-The `@peelbtc/sdk` package entrypoint currently exports:
-
-- `fetchBalances(identity, overrides?)` — multi-layer balance orchestrator
-- Re-exported types from `@peelbtc/types`:
-  - `BalanceMap`
-  - `LayerBalance`
-  - `RpcOverrides`
-  - `BalanceKind`
+| Group | Functions |
+|---|---|
+| Balances | `fetchBalances` |
+| BOB txs | `buildBobEthTransfer`, `buildBobTokenTransfer`, `prepareBobTx`, `serializeBobTx`, `encodeBobSignedTx`, `broadcastBobTx` |
+| Rootstock txs | `buildRootstockTransfer`, `prepareRootstockTx`, `serializeRootstockTx`, `encodeRootstockSignedTx`, `broadcastRootstockTx` |
+| Citrea txs | `buildCitreaTransfer`, `prepareCitreaTx`, `serializeCitreaTx`, `encodeCitreaSignedTx`, `broadcastCitreaTx` |
+| Stacks txs | `buildStxTransfer`, `buildSbtcTransfer`, `prepareStacksTx`, `encodeStacksSignedTx`, `broadcastStacksTx` |
+| Rootstock bridge | `RootstockFlyoverBridgeAdapter`, `FLYOVER_LBC_ADDRESS`, `FLYOVER_LIMITS` |
+| sBTC bridge | `buildSbtcDepositPlan`, `notifySbtcDeposit`, `pollSbtcDepositStatus`, `prepareSbtcWithdrawalTx`, `pollSbtcWithdrawalStatus` |
+| EVM recipient recovery | `recoverEvmRecipientIdentity`, `recoverPublicKeyFromEvmAddress` |
 
 ---
 
-## `fetchBalances(identity, overrides?)`
+## EVM Recipient Recovery
+
+Recovers a full BRID identity from an EVM (`0x...`) address using any existing
+signed transaction. Complements the Bitcoin + Stacks recovery in `@peelbtc/core`.
+
+```ts
+import { recoverEvmRecipientIdentity, recoverPublicKeyFromEvmAddress } from "@peelbtc/sdk";
+
+// Full identity map from any 0x... address
+const identity = await recoverEvmRecipientIdentity("0x2935C2...", {
+  evmChain: "bob",                              // "bob" | "rootstock" | "citrea"
+  evmExplorerApiUrl: "https://explorer.gobob.xyz",  // Blockscout API (fast path)
+  // evmRpcUrl: "...",                           // override RPC
+  // evmMaxBlockScan: 100,                       // fallback block scan limit
+})
+// identity.publicKey — recovered compressed pubkey
+// identity.root      — Bitcoin address
+// identity.derived   — [bitcoin, stacks, bob, rootstock, citrea]
+
+// Just the pubkey
+const pubkey = await recoverPublicKeyFromEvmAddress("0x2935C2...", { evmChain: "bob" })
+// Uint8Array(33) — compressed secp256k1 pubkey, or null if no tx found
+```
+
+**How it works:** ECDSA recovers the sender's pubkey from any signed transaction.
+Finding the tx uses the Blockscout explorer API if `evmExplorerApiUrl` is provided
+(fast), or scans the last `evmMaxBlockScan` blocks (slower fallback).
+
+**Explorer API URLs:**
+- BOB mainnet: `https://explorer.gobob.xyz`
+- Rootstock: `https://explorer.rootstock.io`
+- Citrea mainnet: `https://explorer.mainnet.citrea.xyz`
+
+**Limitation:** returns `null` for addresses that have never sent a transaction.
+
+**Bitcoin and Stacks** recovery live in `@peelbtc/core` — see `core.md`.
 
 Fetches native and BTC-pegged asset balances for all Peel-supported layers from a `BridIdentityMap`.
 
@@ -122,7 +175,225 @@ interface LayerBalance {
 
 ---
 
-## BOB Transaction Helpers
+## Rootstock Transaction Helpers
+
+Rootstock uses **legacy (type 0) EVM transactions** — no EIP-1559. Uses `gasPrice` instead of `maxFeePerGas`.
+
+```javascript
+import {
+  buildRootstockTransfer, prepareRootstockTx,
+  serializeRootstockTx, encodeRootstockSignedTx, broadcastRootstockTx,
+} from "/Users/eric/Code/Peel/packages/sdk/dist/index.js";
+```
+
+### Transaction lifecycle
+
+```
+buildRootstockTransfer(...)   → RootstockTxRequest   (intent)
+           ↓
+prepareRootstockTx(...)       → RootstockTxPrepared  (nonce, gas, gasPrice)
+           ↓
+serializeRootstockTx(...)     → Hex                  (unsigned legacy hex, no 0x02 prefix)
+           ↓
+ows sign tx --chain evm --tx <hex>  → r || s || v    (raw recovery ID, NOT send-tx)
+           ↓
+encodeRootstockSignedTx(...)  → Hex                  (signed broadcast-ready blob)
+           ↓
+broadcastRootstockTx(...)     → Hex                  (tx hash)
+```
+
+### Functions
+
+`buildRootstockTransfer(from, to, value, testnet)` — `value` in wei. `testnet=true` → chainId 31, `false` → 30.
+
+`prepareRootstockTx(tx, testnet, rpcUrl?)` — fetches nonce + `gasPrice` (not EIP-1559 fees).
+
+`serializeRootstockTx(tx)` — produces legacy hex. Will **not** start with `0x02`.
+
+`encodeRootstockSignedTx(tx, sig)` — injects OWS signature. Automatically applies EIP-155 `v` encoding (`chainId * 2 + 35 + recoveryId`). Accepts `v` as `0`/`1` (OWS) or `27`/`28` (viem).
+
+`broadcastRootstockTx(signedTxHex, testnet, rpcUrl?)` — submits via `sendRawTransaction`.
+
+### OWS signing — critical notes
+
+Use `ows sign tx`, **not** `ows sign send-tx`. The `send-tx` path expects a typed tx (`0x01`/`0x02`) and will reject legacy hex:
+
+```bash
+ows sign tx --wallet <name> --chain evm --tx <unsignedHex> --json
+```
+
+`encodeRootstockSignedTx` handles EIP-155 `v` conversion internally — pass the raw OWS signature as-is.
+
+### Example
+
+```javascript
+const intent = buildRootstockTransfer("0xSENDER", "0xRECIPIENT", 1n, true); // testnet
+const prepared = await prepareRootstockTx(intent, true);
+const unsignedHex = serializeRootstockTx(prepared);
+
+// ows sign tx --chain evm --tx <unsignedHex> --json
+const owsSig = { signature: "<hex r||s||v from OWS>" };
+
+const signedHex = encodeRootstockSignedTx(prepared, owsSig);
+const txHash = await broadcastRootstockTx(signedHex, true);
+console.log("explorer: https://explorer.testnet.rsk.co/tx/" + txHash);
+```
+
+---
+
+## Citrea Transaction Helpers
+
+Citrea uses **EIP-1559 (type 2)** transactions — same pattern as BOB.
+
+```javascript
+import {
+  buildCitreaTransfer, prepareCitreaTx,
+  serializeCitreaTx, encodeCitreaSignedTx, broadcastCitreaTx,
+} from "/Users/eric/Code/Peel/packages/sdk/dist/index.js";
+```
+
+### Functions
+
+`buildCitreaTransfer(from, to, value, testnet)` — `value` in wei. `testnet=true` → chainId 5115 (testnet), `false` → 4114 (mainnet).
+
+`prepareCitreaTx(tx, testnet, rpcUrl?)` — fetches nonce + EIP-1559 fee data.
+
+`serializeCitreaTx(tx)` — produces `0x02...` hex.
+
+`encodeCitreaSignedTx(tx, sig)` — attaches signature. `v` is `yParity` (0 or 1) for type-2 txs.
+
+`broadcastCitreaTx(signedTxHex, testnet, rpcUrl?)` — submits via `sendRawTransaction`.
+
+### Example
+
+```javascript
+const intent = buildCitreaTransfer("0xSENDER", "0xRECIPIENT", 1n, true); // testnet
+const prepared = await prepareCitreaTx(intent, true);
+const unsignedHex = serializeCitreaTx(prepared);
+
+// ows sign-transaction --chain evm --tx <unsignedHex> --json
+const owsSig = { signature: "<hex r||s||v from OWS>" };
+
+const signedHex = encodeCitreaSignedTx(prepared, owsSig);
+const txHash = await broadcastCitreaTx(signedHex, true);
+console.log("explorer: https://explorer.testnet.citrea.xyz/tx/" + txHash);
+```
+
+Testnet faucet: `https://faucet.testnet.citrea.xyz`
+
+---
+
+## Stacks Transaction Helpers
+
+Stacks uses **secp256k1** — the same curve as Bitcoin. Signing is done with the OWS Bitcoin signer.
+
+```javascript
+import {
+  buildStxTransfer, buildSbtcTransfer,
+  prepareStacksTx, encodeStacksSignedTx, broadcastStacksTx,
+} from "/Users/eric/Code/Peel/packages/sdk/dist/index.js";
+```
+
+### Transaction lifecycle
+
+```
+buildStxTransfer(...)       → StacksTxRequest    (STX native transfer)
+buildSbtcTransfer(...)      → StacksTxRequest    (sBTC SIP-010 transfer)
+         ↓
+prepareStacksTx(...)        → StacksTxPrepared   (nonce, fee, preSignSigHash)
+         ↓
+ows sign tx --chain bitcoin --tx <preSignSigHash>  → r || s || v
+         ↓
+encodeStacksSignedTx(...)   → string             (broadcast-ready hex)
+         ↓
+broadcastStacksTx(...)      → string             (txid)
+```
+
+### Functions
+
+`buildStxTransfer(from, to, amount, publicKey, testnet)` — `amount` in **microSTX** (1 STX = 1,000,000 microSTX).
+
+`buildSbtcTransfer(from, to, amount, publicKey, testnet)` — `amount` in **satoshis** (8 decimals).
+
+`prepareStacksTx(tx, fee?, hiroBaseUrl?)` — fetches nonce from Hiro API (prefers mempool-aware `possible_next_nonce`). Default fee: 2000 microSTX.
+
+`encodeStacksSignedTx(prepared, sig)` — converts OWS `r||s||v` to Stacks `v||r||s` automatically.
+
+`broadcastStacksTx(signedTxHex, testnet)` — broadcasts to Stacks node.
+
+### `publicKey` — compressed key requirement
+
+**Always pass the 33-byte compressed pubkey (66 hex chars, prefix `02` or `03`).**
+
+Stacks derives addresses from the **compressed** secp256k1 public key. This follows the
+Stacks convention of appending an `01` byte to the raw 32-byte private key before address
+derivation — the `01` signals "use compressed key format." The practical consequence:
+
+- ✅ `OWS_PUBKEY` from `ows wallet info --json` → already the 33-byte compressed key
+- ❌ Uncompressed key (65 bytes, prefix `04`) → derives a **different** address → `NotEnoughFunds` on broadcast, even if the wallet is funded
+- ❌ Using `viem.privateKeyToAccount(privKey).publicKey` directly → returns uncompressed in some versions → wrong address
+
+If you derive the Stacks address from a private key programmatically, strip the `02`/`03`
+prefix check:
+
+```ts
+// Safe: use @stacks/transactions publicKeyToAddress with the COMPRESSED key
+const stxAddress = publicKeyToAddress("0365b706...", "testnet")  // 66 hex chars, starts with 02/03
+
+// Unsafe: viem may return uncompressed (130 hex chars, starts with 04)
+// Convert to compressed before passing to Stacks functions
+```
+
+Source for the correct key: `ows wallet info --wallet <name> --json` → `publicKey` field (always compressed).
+
+### OWS signing — `ows sign tx`, not `ows sign send-tx`
+
+The `preSignSigHash` is a raw 32-byte hash that must be signed **without re-hashing**.
+Use `ows sign tx` with `--chain bitcoin`:
+
+```bash
+# preSignSigHash is already hashed — the signer must NOT hash it again
+ows sign tx --chain bitcoin --tx <prepared.preSignSigHash> --json
+# Returns: { signature: "<hex r||s||v>" }
+```
+
+Do **not** use `ows sign send-tx` — that path is for broadcasting, not raw signing.
+Do **not** use `ows sign message` — that path re-hashes the payload.
+
+`encodeStacksSignedTx` converts OWS `r||s||v` format to Stacks `v||r||s` format automatically.
+Pass the raw OWS signature as-is — no manual reordering needed.
+
+### Example — sBTC transfer (testnet)
+
+```javascript
+const intent = buildSbtcTransfer(
+  "ST...",           // sender (ST... for testnet)
+  "ST...",           // recipient
+  1n,               // 1 satoshi
+  "0365b706...",    // 33-byte compressed pubkey from OWS
+  true,             // testnet
+);
+
+const prepared = await prepareStacksTx(intent, 2000n, "https://api.testnet.hiro.so");
+// prepared.preSignSigHash → 32-byte hex, pass to OWS
+
+// ows sign tx --chain bitcoin --tx <prepared.preSignSigHash> --json
+const owsSig = { signature: "<hex r||s||v from OWS>" };
+
+const signedHex = encodeStacksSignedTx(prepared, owsSig);
+const txid = await broadcastStacksTx(signedHex, true);
+console.log("explorer: https://explorer.hiro.so/txid/" + txid + "?chain=testnet");
+```
+
+### Required env vars (integration tests)
+
+| Var | Description |
+|---|---|
+| `OWS_BRID_STACKS_TESTNET` | Stacks testnet address (ST...) |
+| `OWS_PUBKEY` | 33-byte compressed pubkey hex (from `ows wallet info`) |
+| `OWS_PRIVKEY` | Raw 32-byte private key hex (for test signing) |
+
+---
 
 All BOB transaction helpers are exported from the package entrypoint — use the same import as `fetchBalances`:
 
@@ -237,55 +508,35 @@ console.log("explorer: https://explorer.gobob.xyz/tx/" + txHash);
 
 ## Integration Tests
 
-BOB integration tests (mainnet):
-
 ```bash
 cd /Users/eric/Code/Peel
 set -a; source .env.local; set +a
 pnpm --filter @peelbtc/sdk test:integration
 ```
 
-Required env vars (from `.env.local`):
-- `OWS_BRID_EVM` — EVM address for read-only balance tests
-- `OWS_PRIVKEY` — raw private key hex (no 0x prefix) for signing tests
+Required env vars (`.env.local`):
 
-Test coverage:
-1. Balance fetching — ETH + wBTC from BOB mainnet
-2. Tx preparation — nonce, gas, fee data, RLP encoding
-3. Signing — r, s, v output from private key
-4. Encoding — signed broadcast-ready blob
-5. Broadcast — submit to BOB mainnet, return tx hash
+| Var | Used by |
+|---|---|
+| `OWS_BRID_EVM` | BOB, Rootstock, Citrea balance + prepare tests |
+| `OWS_BRID_STACKS_TESTNET` | Stacks balance + prepare tests |
+| `OWS_PUBKEY` | Stacks tx signing (33-byte compressed pubkey) |
+| `OWS_PRIVKEY` | All signing + broadcast tests (raw 32-byte hex) |
 
----
+Test files and coverage:
 
-## Rootstock Signing Notes
-
-### Use `ows sign tx`, not `ows sign send-tx`
-
-Peel serializes Rootstock transactions as **unsigned legacy (type 0) EVM transactions** — no `0x01`/`0x02` type prefix. OWS's `sign send-tx` path expects a typed transaction and will reject legacy hex. Always use `ows sign tx` for Rootstock:
-
-```bash
-# Serialize the unsigned tx via Peel, then sign with OWS:
-ows sign tx --wallet <name> --chain evm --tx <unsignedHex> --json
-# Returns: { recovery_id: 0|1, signature: "<hex r||s||v>" }
-```
-
-### EIP-155 `v` is handled internally
-
-`encodeRootstockSignedTx` automatically converts the raw recovery ID (`0`/`1`) from OWS into the EIP-155 legacy `v` value required by Rootstock:
-
-```
-v = chainId * 2 + 35 + recoveryId
-```
-
-For Rootstock mainnet (chainId 30): `v` = 95 or 96  
-For Rootstock testnet (chainId 31): `v` = 97 or 98
-
-Passing the raw OWS signature directly to `encodeRootstockSignedTx` is correct — no manual conversion needed. Both raw recovery IDs (`0`/`1`) and legacy Ethereum form (`27`/`28`) are accepted.
+| File | Tests |
+|---|---|
+| `bob.integration.test.ts` | Balance, prepare, sign, encode, broadcast (mainnet — needs wBTC) |
+| `rootstock.integration.test.ts` | Balance (mainnet), prepare+serialize, sign, encode, broadcast (testnet) |
+| `citrea.integration.test.ts` | Balance (testnet), prepare+serialize, sign, encode, broadcast (testnet — needs cBTC) |
+| `stacks.integration.test.ts` | Balance (testnet), prepare STX+sBTC, sign, encode, broadcast sBTC (testnet) |
 
 ---
 
 ## Known Caveats
 
-- Some testnet token addresses are placeholders marked with `⚠️ VERIFY` comments in source
-- Stacks sBTC testnet contract address is a placeholder — verify before testnet use
+- BOB wBTC testnet contract address is unverified — check before using on bobSepolia
+- Citrea and BOB testnet ERC-20 addresses may be placeholders — marked `⚠️ VERIFY` in source
+- sBTC testnet contract: `ST1F7QA2MDF17S807EPA36TSS8AMEFY4KA9TVGWXT.sbtc-token`
+- Stacks sBTC bridging (`buildSbtcDepositPlan`, `prepareSbtcWithdrawalTx`) is **mainnet only**

@@ -186,12 +186,12 @@ const { version, hashbytes } = decodeBtcAddress("bc1p...")
 | `sbtc-token` | `SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token` |
 | `sbtc-withdrawal` | `SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-withdrawal` |
 
-## Timing and fees
+## Timing, fees, and limits
 
-| Flow | Typical time | Fee notes |
-|---|---|---|
-| Peg-in | ~20 min (1–2 BTC confs) | `maxSignerFee` sats deducted from minted sBTC |
-| Peg-out | ~1 hour (6 BTC confs) | `maxFeeSats` locked, difference refunded as sBTC |
+| Flow | Minimum | Typical time | Fee notes |
+|---|---|---|---|
+| Peg-in | **0.0001 BTC** (10,000 sats) | ~20 min (1–2 BTC confs) | `maxSignerFee` sats deducted from minted sBTC |
+| Peg-out | **0.0001 BTC** (10,000 sats) | ~1 hour (6 BTC confs) | `maxFeeSats` locked, difference refunded as sBTC |
 
 ## Sources
 

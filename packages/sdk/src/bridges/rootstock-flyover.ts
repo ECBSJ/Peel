@@ -136,6 +136,19 @@ export interface RootstockFlyoverAdapterOptions {
    * standard EIP-55 checksummed addresses instead of RSK-checksummed ones.
    */
   disableChecksum?: boolean;
+  /**
+   * Prefer liquidity providers that do not require a CAPTCHA token.
+   * Default: `true`.
+   *
+   * Some LPs (e.g. Tekos Capital) require an hCaptcha token on every
+   * `acceptQuote` call. This is only solvable in a browser context and will
+   * fail in CLI/agent environments. When `true`, the adapter will skip
+   * CAPTCHA-required providers and fall back to the first available one
+   * only if no CAPTCHA-free provider is found.
+   *
+   * Set to `false` to use `providerIndex` directly regardless of captcha.
+   */
+  preferNoCaptcha?: boolean;
 }
 
 export interface RootstockPegoutQuoteResult {
@@ -157,6 +170,7 @@ export class RootstockFlyoverBridgeAdapter implements BridgeAdapter {
 
   private readonly flyover: Flyover;
   private readonly providerIndex: number;
+  private readonly preferNoCaptcha: boolean;
 
   constructor(options: RootstockFlyoverAdapterOptions = {}) {
     const testnet = options.testnet ?? false;
@@ -164,6 +178,7 @@ export class RootstockFlyoverBridgeAdapter implements BridgeAdapter {
     this.mintedAsset = testnet ? "tRBTC" : "RBTC";
     this.minDepositSats = options.minDepositSats ?? FLYOVER_LIMITS.minPegInSats;
     this.providerIndex = options.providerIndex ?? 0;
+    this.preferNoCaptcha = options.preferNoCaptcha ?? true;
 
     this.flyover = new Flyover({
       network: testnet ? "Testnet" : "Mainnet",
@@ -189,6 +204,15 @@ export class RootstockFlyoverBridgeAdapter implements BridgeAdapter {
     bitcoinDataSource: Parameters<Flyover["connectToBitcoin"]>[0],
   ): void {
     this.flyover.connectToBitcoin(bitcoinDataSource);
+  }
+
+  /**
+   * Return all available liquidity providers for inspection.
+   * Useful for checking which providers are available and whether they require
+   * a CAPTCHA token (`siteKey !== ""` means captcha is required).
+   */
+  async getLiquidityProviders() {
+    return this.flyover.getLiquidityProviders();
   }
 
   /**
@@ -427,9 +451,22 @@ export class RootstockFlyoverBridgeAdapter implements BridgeAdapter {
     }
 
     const providers = await this.flyover.getLiquidityProviders();
-    const provider = providers.at(this.providerIndex);
-    if (!provider) {
+    if (providers.length === 0) {
       throw new Error("no Flyover liquidity providers available for selected network");
+    }
+
+    let provider = providers[this.providerIndex] ?? providers[0];
+
+    if (this.preferNoCaptcha) {
+      // Prefer a provider that does not require a CAPTCHA token.
+      // siteKey is non-empty when the LP requires hCaptcha verification —
+      // this cannot be satisfied in CLI/agent environments.
+      const noCaptchaProvider = providers.find(p => !p.siteKey);
+      if (noCaptchaProvider) {
+        provider = noCaptchaProvider;
+      }
+      // If all providers require captcha, fall back to the indexed one and
+      // let the SDK surface the error clearly.
     }
 
     this.flyover.useLiquidityProvider(provider);

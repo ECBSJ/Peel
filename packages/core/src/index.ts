@@ -7,8 +7,11 @@ export {
   hashBitcoinMessage,
   recoverPublicKey,
   buildBridIdentityMap,
+  buildIdentityFromPublicKey,
+  recoverPublicKeyFromAddress,
+  recoverRecipientIdentity,
 } from "./identity/index.js";
-export type { BridIdentityMap } from "./identity/index.js";
+export type { BridIdentityMap, RecipientRecoveryOptions } from "./identity/index.js";
 
 // Chain + asset registry
 export {

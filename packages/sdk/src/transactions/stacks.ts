@@ -44,6 +44,8 @@ import {
   uintCV,
   principalCV,
   noneCV,
+  someCV,
+  bufferCV,
   PostConditionMode,
   transactionToHex,
   type StacksTransactionWire,
@@ -95,6 +97,14 @@ export interface StacksTxRequest {
    */
   publicKey: string;
   testnet: boolean;
+  /**
+   * Optional memo to embed in the transaction.
+   * - STX transfers: embedded in the native Stacks `memo` field (max 34 bytes).
+   * - sBTC SIP-010 transfers: passed as the `(optional (buff 34))` memo param
+   *   of the `transfer` function. Max 34 bytes.
+   * The Peel router sets this automatically from the Peel memo when routing.
+   */
+  memo?: Uint8Array;
 }
 
 export interface StacksTxPrepared {
@@ -255,7 +265,7 @@ export async function prepareStacksTx(
         uintCV(tx.amount),
         principalCV(tx.from),
         principalCV(tx.to),
-        noneCV(),
+        tx.memo ? someCV(bufferCV(tx.memo.slice(0, 34))) : noneCV(),
       ],
       publicKey: tx.publicKey,
       network,

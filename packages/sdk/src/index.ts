@@ -1,4 +1,32 @@
 export { fetchBalances } from "./balances/index.js";
+export { routePayment } from "./router/index.js";
+export {
+  recoverEvmRecipientIdentity,
+  recoverPublicKeyFromEvmAddress,
+} from "./identity/recover.js";
+export type { EvmRecoveryOptions, EvmChain } from "./identity/recover.js";
+export type {
+  RouteIntent,
+  RoutePlan,
+  ResolvedIntent,
+  RouteStep,
+  BtcSendStep,
+  EvmTransferStep,
+  StacksTransferStep,
+  BridgeDepositStep,
+  BridgeNotifyStep,
+  SbtcWithdrawalStep,
+  SbtcDepositParams,
+  FlyoverDepositParams,
+  BobGatewayParams,
+  EncodedMemo,
+  NetworkLivenessResult,
+  RecipientHint,
+  ScoreWeights,
+  NetworkLayer,
+  BridgeName,
+} from "./router/types.js";
+export { PEEL_MEMO_MAGIC, PEEL_MEMO_VERSION, encodePeelMemo } from "./router/memo.js";
 export {
   buildBobEthTransfer,
   buildBobTokenTransfer,

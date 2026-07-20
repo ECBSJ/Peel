@@ -11,6 +11,10 @@ import {
   hashBitcoinMessage,
   recoverPublicKey,
   buildBridIdentityMap,
+  // Recipient recovery (no signing required)
+  buildIdentityFromPublicKey,
+  recoverPublicKeyFromAddress,
+  recoverRecipientIdentity,
   NETWORKS,
   getNetwork,
   getMainnetNetworks,
@@ -76,7 +80,63 @@ interface BridIdentityMap {
 }
 ```
 
-## Registry
+---
+
+## Recipient Recovery (no signing required)
+
+Three on-chain recovery paths derive a full BRID identity from a recipient's address
+without requiring the recipient to sign anything. The public key is extracted from
+existing transaction data on-chain.
+
+| Path | Source | Reliability |
+|---|---|---|
+| Bitcoin (`bc1q...`) | Compressed pubkey in P2WPKH spending witness | Only if address has spent a UTXO |
+| Stacks (`SP...`/`ST...`) | ECDSA recovery from any signed tx via Hiro API | Any address that has sent a tx |
+| EVM (`0x...`) | ECDSA recovery from any signed tx via RPC/explorer | Any address that has sent a tx — see `@peelbtc/sdk` |
+
+Limitation: receive-only addresses that have never sent a tx have not revealed
+their public key on-chain and cannot be recovered. The BRID signing step is still
+needed for those.
+
+### `recoverRecipientIdentity(address, options?)`
+
+High-level: recovers pubkey from a Bitcoin or Stacks address and returns a full
+`BridIdentityMap` (Bitcoin + Stacks + all EVM addresses derived from the same key).
+Returns `null` if recovery fails.
+
+```typescript
+const identity = await recoverRecipientIdentity("SPET5CSE...")
+// identity.publicKey — recovered compressed pubkey
+// identity.root — bitcoin address
+// identity.derived — [bitcoin, stacks, bob, rootstock, citrea]
+```
+
+### `recoverPublicKeyFromAddress(address, options?)`
+
+Lower-level: returns the raw 33-byte compressed pubkey as `Uint8Array`, or `null`.
+
+```typescript
+const pubkey = await recoverPublicKeyFromAddress("bc1qrk3...") // Bitcoin
+const pubkey = await recoverPublicKeyFromAddress("SP1..."    ) // Stacks
+```
+
+Options (`RecipientRecoveryOptions`):
+- `hiroBaseUrl` — Hiro API base URL (default: `https://api.hiro.so`)
+- `bitcoinApiUrl` — mempool.space base URL (default: `https://mempool.space/api`)
+- `testnet` — use testnet APIs
+
+### `buildIdentityFromPublicKey(pubkey, testnet?)`
+
+Pure function (no network). Given a 33-byte compressed pubkey (`Uint8Array` or hex string),
+returns a full `BridIdentityMap`. Use this after any recovery path to build the identity.
+
+```typescript
+const identity = buildIdentityFromPublicKey("0365b706...", false)
+// Same result as BRID signing, but derived directly from the known pubkey
+```
+
+**EVM recipient recovery** lives in `@peelbtc/sdk` — see `sdk.md` →
+`recoverEvmRecipientIdentity` / `recoverPublicKeyFromEvmAddress`.
 
 ### `NETWORKS` / `getNetwork(id)` / `getMainnetNetworks()` / `getTestnetNetworks()`
 
