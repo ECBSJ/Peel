@@ -1,6 +1,6 @@
 {
   "name": "@peelbtc/types",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "Publishable type interfaces for the Peel protocol",
   "license": "MIT",
   "main": "./dist/index.cjs",
@@ -19,7 +19,9 @@
     }
   },
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run --passWithNoTests",
