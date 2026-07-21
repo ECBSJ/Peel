@@ -2,6 +2,15 @@
   "name": "peel",
   "version": "0.0.0",
   "private": true,
+  "description": "Bitcoin payment routing across L1 and L2s",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ECBSJ/Peel.git"
+  },
+  "homepage": "https://github.com/ECBSJ/Peel",
+  "bugs": {
+    "url": "https://github.com/ECBSJ/Peel/issues"
+  },
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
