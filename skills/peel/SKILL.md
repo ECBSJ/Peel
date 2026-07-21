@@ -61,6 +61,24 @@ Use this skill when the user asks to:
 
 ## Prerequisites
 
+### Signing tool (required)
+
+Peel never handles private keys. All transaction signing is done externally by a key management tool.
+
+**Recommended: Open Wallet Standard (OWS)**
+
+```bash
+curl -fsSL https://docs.openwallet.sh/install.sh | bash
+```
+
+All signing examples throughout these docs use OWS commands (`ows sign tx`, `ows wallet info`, etc.). Any compatible tool must be able to:
+
+- Expose a **33-byte compressed secp256k1 public key** (hex, no `0x` prefix)
+- Sign raw tx hex with `--chain bitcoin` (Stacks, Bitcoin) or `--chain evm` (BOB, Rootstock, Citrea)
+- Return a 65-byte signature as `r(32) || s(32) || v(1)` hex
+
+### Peel SDK
+
 - The Peel SDK must be built: `cd /Users/eric/Code/Peel && pnpm --filter @peelbtc/core build`
 - Import from the dist path: `/Users/eric/Code/Peel/packages/core/dist/index.js`
 - All code must use `--input-type=module` or be inside an ESM context
