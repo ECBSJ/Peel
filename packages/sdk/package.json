@@ -39,5 +39,26 @@
   },
   "devDependencies": {
     "dotenv": "^17.4.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ECBSJ/Peel.git",
+    "directory": "packages/sdk"
+  },
+  "keywords": [
+    "bitcoin",
+    "btc",
+    "stacks",
+    "sbtc",
+    "rootstock",
+    "bob",
+    "citrea",
+    "brid",
+    "routing",
+    "payments",
+    "l2"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

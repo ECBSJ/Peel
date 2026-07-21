@@ -36,5 +36,26 @@
     "@peelbtc/types": "workspace:*",
     "@stacks/transactions": "^7.4.0",
     "dotenv": "^17.4.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ECBSJ/Peel.git",
+    "directory": "packages/core"
+  },
+  "keywords": [
+    "bitcoin",
+    "btc",
+    "stacks",
+    "sbtc",
+    "rootstock",
+    "bob",
+    "citrea",
+    "brid",
+    "routing",
+    "payments",
+    "l2"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
