@@ -114,11 +114,23 @@ Derive a recipient's full cross-chain identity from any of their on-chain addres
 
 ## Install
 
+**For developers:**
+
 ```bash
 npm install @peelbtc/sdk@alpha
 ```
 
 `@peelbtc/core` and `@peelbtc/types` are installed automatically as dependencies.
+
+**For AI agents:**
+
+One command installs the SDK + skills for all detected coding assistants:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ECBSJ/Peel/main/install.sh | bash
+```
+
+This detects and configures GitHub Copilot, Cursor, Claude Code, and 10+ other agents.
 
 ---
 
@@ -134,13 +146,36 @@ npm install @peelbtc/sdk@alpha
 
 ## Development
 
-**Requirements:** Node.js 20+, pnpm 10+
+**Requirements:** Node.js 18+, pnpm 10+
 
 ```bash
 pnpm install
 pnpm build
 pnpm test
 ```
+
+---
+
+## Roadmap
+
+### v0.1.0-alpha (current)
+
+Core payment routing across Bitcoin L1 and L2s. Address derivation, BRID identity, balance orchestration, transactions, bridges, and recipient recovery.
+
+### v1.0 (planned)
+
+- `@peelbtc/mcp` — MCP server for AI agent integration
+- Flyover peg-out (Rootstock → Bitcoin) with unsigned-first pattern
+- Citrea peg-in bridge
+- L2→L2 multi-hop routing
+- ERC-20 memo relay contract
+- Receive-only address BRID signing alternative
+
+---
+
+## Support & Feedback
+
+Found a bug or have a feature request? [Open an issue on GitHub](https://github.com/ECBSJ/Peel/issues).
 
 ---
 
