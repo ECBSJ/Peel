@@ -1,6 +1,6 @@
 {
   "name": "@peelbtc/sdk",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Full Peel SDK — A Payments Engine for Every Layer",
   "license": "MIT",
   "main": "./dist/index.cjs",

@@ -1,6 +1,6 @@
 {
   "name": "@peelbtc/types",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Publishable type interfaces for the Peel protocol",
   "license": "MIT",
   "main": "./dist/index.cjs",
