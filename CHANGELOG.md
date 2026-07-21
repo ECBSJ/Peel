@@ -4,6 +4,14 @@ All notable changes to the Peel monorepo are documented here.
 
 ---
 
+## [0.1.0-alpha.2] — 2026-07-21
+
+- Added `README.md` to all published packages (`@peelbtc/types`, `@peelbtc/core`, `@peelbtc/sdk`)
+- Fixed npm `latest` dist-tag to point to `0.1.0-alpha.2`
+- No code changes from `0.1.0-alpha.1`
+
+---
+
 ## [0.1.0-alpha.1] — 2026-07-20
 
 Initial alpha release. Early testers only.
