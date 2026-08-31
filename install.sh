@@ -46,6 +46,9 @@ AGENT_DIRS=(
   ".roo|Roo"
   ".kiro|Kiro"
   ".augment|Augment"
+  ".ori|Ori"
+  ".prime|Prime"
+  ".dsh|Dsh"
 )
 
 TMPDIR_PEEL=""
